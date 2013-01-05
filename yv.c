@@ -47,7 +47,7 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y);
 void draw_frame(void);
 Uint32 read_frame(void);
 void setup_param(void);
-void check(void);
+void check_input(void);
 Uint32 create_message_queue(void);
 void destroy_message_queue(void);
 Uint32 connect_message_queue(void);
@@ -413,7 +413,7 @@ void setup_param(void)
     }
 }
 
-void check(void)
+void check_input(void)
 {
     Uint32 file_size;
 
@@ -828,18 +828,18 @@ int main(int argc, char** argv)
         return(EXIT_FAILURE);
     }
 
+    fd = fopen(P.filename, "rb");
+    if (fd == NULL) {
+        fprintf(stderr, "Error opening %s\n", P.filename);
+        goto cleanup;
+    }
+
     if (!allocate_memory()) {
         goto cleanup;
     }
 
-    fd = fopen(P.filename, "rb");
-    if (fd == NULL) {
-        fprintf(stderr, "Error opening %s\n", P.filename);
-        return(EXIT_FAILURE);
-    }
-
     /* Lets do some basic consistency check on input */
-    check();
+    check_input();
 
     /* send event to display first frame */
     event.type = SDL_KEYDOWN;
@@ -856,7 +856,9 @@ cleanup:
     free(P.y_data);
     free(P.cb_data);
     free(P.cr_data);
-    fclose(fd);
+    if (fd) {
+        fclose(fd);
+    }
 
     return EXIT_SUCCESS;
 }
