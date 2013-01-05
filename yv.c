@@ -36,7 +36,9 @@ Uint32 read_422(void);
 Uint32 allocate_memory(void);
 void draw_grid422(void);
 void draw_grid420(void);
-void bw(void);
+void luma_only(void);
+void cb_only(void);
+void cr_only(void);
 void draw_420(void);
 void draw_422(void);
 void usage(char* name);
@@ -44,7 +46,7 @@ void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch);
 void show_mb(Uint32 mouse_x, Uint32 mouse_y);
 void draw_frame(void);
 Uint32 read_frame(void);
-void setup(void);
+void setup_param(void);
 void check(void);
 Uint32 create_message_queue(void);
 void destroy_message_queue(void);
@@ -81,7 +83,9 @@ struct param {
     Uint32 y_start_pos;       /* start pos for forst Y pel */
     Uint32 cb_start_pos;      /* start pos for first Cb pel */
     Uint32 cr_start_pos;      /* start pos for first Cr pel */
-    Uint32 bw;                /* Black 'n White, i.e Luma only */
+    Uint32 y_only;            /* Grayscale, i.e Luma only */
+    Uint32 cb_only;           /* Only Cb plane */
+    Uint32 cr_only;           /* Only Cr plane */
     Uint32 mb;                /* macroblock-mode - on or off */
     Uint32 y_size;            /* sizeof luma-data for 1 frame - in bytes */
     Uint32 cb_size;           /* sizeof croma-data for 1 frame - in bytes */
@@ -211,11 +215,11 @@ void draw_grid420(void)
     }
 }
 
-void bw(void)
+void luma_only(void)
 {
     Uint32 i;
 
-    if (!P.bw) {
+    if (!P.y_only) {
         return;
     }
 
@@ -235,20 +239,72 @@ void bw(void)
     }
 }
 
+void cb_only(void)
+{
+    Uint32 i;
+
+    if (!P.cb_only) {
+        return;
+    }
+
+    if (FORMAT == YV12 || FORMAT == IYUV) {
+        /* Set Luma part and Cr to 0x80 */
+        for (i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
+        for (i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
+        return;
+    }
+
+    /* YUY2, UYVY, YVYU */
+    for (i = P.y_start_pos; i < P.frame_size; i += 2) {
+        *(my_overlay->pixels[0] + i) = 0x80;
+    }
+    for (i = P.cr_start_pos; i < P.frame_size; i += 4) {
+        *(my_overlay->pixels[1] + i) = 0x80;
+    }
+}
+
+void cr_only(void)
+{
+    Uint32 i;
+
+    if (!P.cr_only) {
+        return;
+    }
+
+    if (FORMAT == YV12 || FORMAT == IYUV) {
+        /* Set Luma part and Cb to 0x80 */
+        for (i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
+        for (i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
+        return;
+    }
+
+    /* YUY2, UYVY, YVYU */
+    for (i = P.y_start_pos; i < P.frame_size; i += 2) {
+        *(my_overlay->pixels[0] + i) = 0x80;
+    }
+    for (i = P.cb_start_pos; i < P.frame_size; i += 4) {
+        *(my_overlay->pixels[2] + i) = 0x80;
+    }
+}
+
 void draw_420(void)
 {
     memcpy(my_overlay->pixels[0], P.y_data, P.y_size);
     memcpy(my_overlay->pixels[1], P.cr_data, P.cr_size);
     memcpy(my_overlay->pixels[2], P.cb_data, P.cb_size);
     draw_grid420();
-    bw();
+    luma_only();
+    cb_only();
+    cr_only();
 }
 
 void draw_422(void)
 {
     memcpy(my_overlay->pixels[0], P.raw, P.frame_size);
     draw_grid422();
-    bw();
+    luma_only();
+    cb_only();
+    cr_only();
 }
 
 void usage(char* name)
@@ -316,7 +372,7 @@ Uint32 read_frame(void)
     return (*reader[FORMAT])();
 }
 
-void setup(void)
+void setup_param(void)
 {
     P.zoom = 1;
     P.min_zoom = 1;
@@ -559,7 +615,7 @@ Uint32 event_loop(void)
                             }
                         }
                         break;
-                    case SDLK_RIGHT:
+                    case SDLK_RIGHT: /* next frame */
                         /* check for next frame existing */
                         if (read_frame()) {
                             draw_frame();
@@ -567,8 +623,7 @@ Uint32 event_loop(void)
                             send_message(NEXT);
                         }
                         break;
-                    case SDLK_BACKSPACE:
-                    case SDLK_LEFT:
+                    case SDLK_LEFT: /* previous frame */
                         if (frame > 1) {
                             frame--;
                             fseek(fd, ((frame-1) * P.frame_size), SEEK_SET);
@@ -577,7 +632,7 @@ Uint32 event_loop(void)
                             send_message(PREV);
                         }
                         break;
-                    case SDLK_UP:
+                    case SDLK_UP: /* zoom in */
                         P.zoom++;
                         screen = SDL_SetVideoMode(P.width*P.zoom,
                                                   P.height*P.zoom,
@@ -587,7 +642,7 @@ Uint32 event_loop(void)
                         SDL_DisplayYUVOverlay(my_overlay, &video_rect);
                         send_message(ZOOM_IN);
                         break;
-                    case SDLK_DOWN:
+                    case SDLK_DOWN: /* zoom out */
                         if (P.zoom>P.min_zoom) {
                             P.zoom--;
                             screen = SDL_SetVideoMode(P.width*P.zoom,
@@ -599,7 +654,7 @@ Uint32 event_loop(void)
                             send_message(ZOOM_OUT);
                         }
                         break;
-                    case SDLK_r:
+                    case SDLK_r: /* rewind */
                         if (frame > 1) {
                             frame = 1;
                             fseek(fd, 0, SEEK_SET);
@@ -608,32 +663,52 @@ Uint32 event_loop(void)
                             send_message(REW);
                         }
                         break;
-                    case SDLK_g:
+                    case SDLK_g: /* display grid */
                         P.grid = ~P.grid;
                         draw_frame();
                         break;
-                    case SDLK_m:
+                    case SDLK_m: /* show mb-data on stdout */
                         P.mb = ~P.mb;
                         draw_frame();
                         break;
-                    case SDLK_b:
-                        P.bw = ~P.bw;
+                    case SDLK_F5: /* Luma data only */
+                        P.y_only = ~P.y_only;
+                        P.cb_only = 0;
+                        P.cr_only = 0;
                         draw_frame();
                         break;
-                    case SDLK_F1:  // MASTER-mode
+                    case SDLK_F6: /* Cb data only */
+                        P.cb_only = ~P.cb_only;
+                        P.y_only = 0;
+                        P.cr_only = 0;
+                        draw_frame();
+                        break;
+                    case SDLK_F7: /* Cr data only */
+                        P.cr_only = ~P.cr_only;
+                        P.y_only = 0;
+                        P.cb_only = 0;
+                        draw_frame();
+                        break;
+                    case SDLK_F8: /* display all color planes */
+                        P.y_only = 0;
+                        P.cb_only = 0;
+                        P.cr_only = 0;
+                        draw_frame();
+                        break;
+                    case SDLK_F1: /* MASTER-mode */
                         create_message_queue();
                         P.mode = MASTER;
                         break;
-                    case SDLK_F2:  // SLAVE-mode
+                    case SDLK_F2: /* SLAVE-mode */
                         if (connect_message_queue()) {
                             P.mode = SLAVE;
                         }
                         break;
-                    case SDLK_F3:  // NONE-mode
+                    case SDLK_F3: /* NONE-mode */
                         destroy_message_queue();
                         P.mode = NONE;
                         break;
-                    case SDLK_q:
+                    case SDLK_q: /* quit */
                         quit = 1;
                         send_message(QUIT);
                         break;
@@ -747,7 +822,7 @@ int main(int argc, char** argv)
     }
 
     /* Initialize parameters corresponding to YUV-format */
-    setup();
+    setup_param();
 
     if (!sdl_init()) {
         return(EXIT_FAILURE);

@@ -13,8 +13,8 @@ Basically, because that's whats SDL supports.
 Other YCbCr (YUV) formats are simple to add as long as
 they are 4:2:0 or 4:2:2 8-bpp...
 
-Features:
----------
+Features
+--------
 
 - Play
 - Pause
@@ -23,10 +23,12 @@ Features:
 - Single Step Backwards
 - Zoom In
 - Zoom Out
-- Displaya 16x16 grid on top of a frame
+- Display a 16x16 grid on top of a frame
 - Dump Macro-Block-data to stdout for MB pointed
   to by mouse
 - Only display Luma data
+- Only display Cr data
+- Only display Cb data
 - Master/Slave mode that allows two instances of
   the binary to communicate using a message-queue.
   Commands issued in the Master are also executed
@@ -56,28 +58,25 @@ Supported commands
 ------------------
 
     SPACE - Play clip
-
     RIGHT - Single step 1 frame forward
-
     LEFT - Single step 1 frame backward
-
     r - Rewind
-
     UP - Zoom in
-
     DOWN - Zoom out
-
     g - Enable grid-mode
-
     m - Enable MB-mode, point and click to
         print MB-data to stdout
-
+    F5 - Toggle viewing of Luma data only
+    F6 - Toggle viewing of Cb data only
+    F7 - Toggle viewing of Cr data only
+    F8 - Display all color-planes
     b - Only display Luma data
-
     q - Quit
-
     F1 - MASTER-mode
-
     F2 - SLAVE-mode
-
     F3 - NONE-mode, i.e. disable MASTER/SLAVE-mode
+
+Disclaimer
+----------
+
+Only verified on a Linux based system...
