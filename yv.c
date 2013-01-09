@@ -27,6 +27,10 @@
 #define ZOOM_IN 'd'
 #define ZOOM_OUT 'e'
 #define QUIT 'f'
+#define Y_ONLY 'g'
+#define CB_ONLY 'h'
+#define CR_ONLY 'i'
+#define ALL_PLANES 'j'
 
 /* PROTOTYPES */
 Uint32 rd(Uint8* data, Uint32 size);
@@ -417,7 +421,7 @@ void check_input(void)
 {
     Uint32 file_size;
 
-    /* Frame Size is an even multipe of 16x16 */
+    /* Frame Size is an even multipe of 16x16? */
     if (P.width % 16 != 0) {
         fprintf(stderr, "WIDTH not multiple of 16, check input...\n");
     }
@@ -425,7 +429,7 @@ void check_input(void)
         fprintf(stderr, "HEIGHT not multiple of 16, check input...\n");
     }
 
-    /* Even number of frames */
+    /* Even number of frames? */
     fseek(fd, 0L, SEEK_END);
     file_size = ftell(fd);
     fseek(fd, 0L, SEEK_SET);
@@ -544,6 +548,30 @@ Uint32 event_dispatcher(void)
             case QUIT:
                 event.type = SDL_KEYDOWN;
                 event.key.keysym.sym = SDLK_q;
+                SDL_PushEvent(&event);
+                break;
+
+            case Y_ONLY:
+                event.type = SDL_KEYDOWN;
+                event.key.keysym.sym = SDLK_F5;
+                SDL_PushEvent(&event);
+                break;
+
+            case CB_ONLY:
+                event.type = SDL_KEYDOWN;
+                event.key.keysym.sym = SDLK_F6;
+                SDL_PushEvent(&event);
+                break;
+
+            case CR_ONLY:
+                event.type = SDL_KEYDOWN;
+                event.key.keysym.sym = SDLK_F7;
+                SDL_PushEvent(&event);
+                break;
+
+            case ALL_PLANES:
+                event.type = SDL_KEYDOWN;
+                event.key.keysym.sym = SDLK_F8;
                 SDL_PushEvent(&event);
                 break;
 
@@ -676,17 +704,20 @@ Uint32 event_loop(void)
                         P.cb_only = 0;
                         P.cr_only = 0;
                         draw_frame();
+                        send_message(Y_ONLY);
                         break;
                     case SDLK_F6: /* Cb data only */
                         P.cb_only = ~P.cb_only;
                         P.y_only = 0;
                         P.cr_only = 0;
                         draw_frame();
+                        send_message(CB_ONLY);
                         break;
                     case SDLK_F7: /* Cr data only */
                         P.cr_only = ~P.cr_only;
                         P.y_only = 0;
                         P.cb_only = 0;
+                        send_message(CR_ONLY);
                         draw_frame();
                         break;
                     case SDLK_F8: /* display all color planes */
@@ -694,6 +725,7 @@ Uint32 event_loop(void)
                         P.cb_only = 0;
                         P.cr_only = 0;
                         draw_frame();
+                        send_message(ALL_PLANES);
                         break;
                     case SDLK_F1: /* MASTER-mode */
                         create_message_queue();
@@ -751,19 +783,19 @@ Uint32 parse_input(int argc, char **argv)
     P.width = atoi(argv[2]);
     P.height = atoi(argv[3]);
 
-    if (!strcmp(argv[4], "YV12")) {
+    if (!strncmp(argv[4], "YV12", 4)) {
         P.overlay_format = SDL_YV12_OVERLAY;
         FORMAT = YV12;
-    } else if (!strcmp(argv[4], "IYUV")) {
+    } else if (!strncmp(argv[4], "IYUV", 4)) {
         P.overlay_format = SDL_IYUV_OVERLAY;
         FORMAT = IYUV;
-    } else if (!strcmp(argv[4], "YUY2")) {
+    } else if (!strncmp(argv[4], "YUY2", 4)) {
         P.overlay_format = SDL_YUY2_OVERLAY;
         FORMAT = YUY2;
-    } else if (!strcmp(argv[4], "UYVY")) {
+    } else if (!strncmp(argv[4], "UYVY", 4)) {
         P.overlay_format = SDL_UYVY_OVERLAY;
         FORMAT = UYVY;
-    } else if (!strcmp(argv[4], "YVYU")) {
+    } else if (!strncmp(argv[4], "YVYU", 4)) {
         P.overlay_format = SDL_YVYU_OVERLAY;
         FORMAT = YVYU;
     } else {
@@ -846,6 +878,7 @@ int main(int argc, char** argv)
     event.key.keysym.sym = SDLK_RIGHT;
     SDL_PushEvent(&event);
 
+    /* while true */
     event_loop();
 
 cleanup:
