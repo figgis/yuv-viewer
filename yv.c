@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
 
@@ -45,6 +44,7 @@ void cb_only(void);
 void cr_only(void);
 void draw_420(void);
 void draw_422(void);
+Uint32 diff_mode(void);
 void usage(char* name);
 void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch);
 void show_mb(Uint32 mouse_x, Uint32 mouse_y);
@@ -52,6 +52,7 @@ void draw_frame(void);
 Uint32 read_frame(void);
 void setup_param(void);
 void check_input(void);
+Uint32 open_input(void);
 Uint32 create_message_queue(void);
 void destroy_message_queue(void);
 Uint32 connect_message_queue(void);
@@ -76,15 +77,16 @@ struct my_msgbuf {
 };
 
 struct param {
-    Uint32 width;             /* frame width in pixels */
+    Uint32 width;             /* frame width - in pixels */
     Uint32 height;            /* frame height - in pixels */
-    Uint32 wh;                /* width * height */
+    Uint32 wh;                /* width x height */
     Uint32 frame_size;        /* size of 1 frame - in bytes */
     Uint32 zoom;              /* zoom-factor */
     Uint32 min_zoom;
     Uint32 grid;              /* grid-mode - on or off */
     Uint32 grid_start_pos;
-    Uint32 y_start_pos;       /* start pos for forst Y pel */
+    Uint32 diff;              /* diff-mode */
+    Uint32 y_start_pos;       /* start pos for first Y pel */
     Uint32 cb_start_pos;      /* start pos for first Cb pel */
     Uint32 cr_start_pos;      /* start pos for first Cr pel */
     Uint32 y_only;            /* Grayscale, i.e Luma only */
@@ -96,10 +98,10 @@ struct param {
     Uint32 cr_size;           /* sizeof croma-data for 1 frame - in bytes */
     Uint8* raw;               /* pointer towards complete frame - frame_size bytes */
     Uint8* y_data;            /* pointer towards luma-data */
-    Uint8* cb_data;           /* pointer towards - croma-data */
-    Uint8* cr_data;           /* pointer towards - croma-data */
-    Uint32 scale[5];
+    Uint8* cb_data;           /* pointer towards croma-data */
+    Uint8* cr_data;           /* pointer towards croma-data */
     char* filename;           /* obvious */
+    char* fname_diff;         /* see above */
     Uint32 overlay_format;    /* YV12, IYUV, YUY2, UYVY or YVYU - SDL */
     Uint32 vflags;            /* HW support or SW support */
     Uint8 bpp;                /* bits per pixel */
@@ -107,6 +109,7 @@ struct param {
     struct my_msgbuf buf;
     int msqid;
     key_t key;
+    FILE* fd2;                /* diff file */
 };
 
 /* Global parameter struct */
@@ -157,7 +160,6 @@ Uint32 read_422(void)
     return 1;
 }
 
-
 Uint32 allocate_memory(void)
 {
     P.raw = malloc(sizeof(Uint8) * P.frame_size);
@@ -166,6 +168,7 @@ Uint32 allocate_memory(void)
     P.cr_data = malloc(sizeof(Uint8) * P.cr_size);
 
     if (!P.raw || !P.y_data || !P.cb_data || !P.cr_data) {
+        fprintf(stderr, "Error allocating memory...\n");
         return 0;
     }
     return 1;
@@ -314,7 +317,7 @@ void draw_422(void)
 void usage(char* name)
 {
     fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "%s filename width height format\n", name);
+    fprintf(stderr, "%s filename width height format [diff_filename]\n", name);
 }
 
 void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch)
@@ -373,7 +376,81 @@ void draw_frame(void)
 
 Uint32 read_frame(void)
 {
-    return (*reader[FORMAT])();
+    if (!P.diff) {
+        return (*reader[FORMAT])();
+    } else {
+        return diff_mode();
+    }
+}
+
+Uint32 diff_mode(void)
+{
+    FILE* fd_tmp;
+    Uint8* y_tmp;
+    Uint32 i;
+    Uint32 j = 0;
+
+    /* Perhaps a bit ugly but it seams to work...
+     * 1. read frame from fd
+     * 2. store data away
+     * 3. read frame from P.fd2
+     * 4. calculate diff
+     * 5. place result in P.raw or P.y_data depending on FORMAT
+     * 6. diff works on luma data so clear P.cb_data and P.cr_data
+     * Fiddle with the file descriptors so that we read
+     * from correct file.
+     */
+
+    if (!(*reader[FORMAT])()) {
+        return 0;
+    }
+
+    y_tmp = malloc(sizeof(Uint8) * P.y_size);
+
+    if (!y_tmp) {
+        fprintf(stderr, "Error allocating memory...\n");
+        return 0;
+    }
+
+    for (i = 0; i < P.y_size; i++) {
+        y_tmp[i] = P.y_data[i];
+    }
+
+    fd_tmp = fd;
+    fd = P.fd2;
+
+    if (!(*reader[FORMAT])()) {
+        free(y_tmp);
+        fd = fd_tmp;
+        return 0;
+    }
+
+    /* restore file descriptor */
+    fd = fd_tmp;
+
+    /* now, P.y_data contains luminance data for fd2 and
+     * y_tmp contains luma data for fd.
+     * Calculate diff and place result where it belongs
+     * Clear croma data */
+
+    if (FORMAT == YV12 || FORMAT == IYUV) {
+        for (i = 0; i < P.y_size; i++) {
+            P.y_data[i] = 0x80 - (y_tmp[i] - P.y_data[i]);
+        }
+        for (i = 0; i < P.cb_size; i++) P.cb_data[i] = 0x80;
+        for (i = 0; i < P.cr_size; i++) P.cr_data[i] = 0x80;
+    } else {
+        for (i = P.y_start_pos; i < P.frame_size; i += 2) {
+            P.raw[i] = 0x80 - (y_tmp[j] - P.y_data[j]);
+            j++;
+        }
+        for (i = P.cb_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
+        for (i = P.cr_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
+    }
+
+    free(y_tmp);
+
+    return 1;
 }
 
 void setup_param(void)
@@ -583,7 +660,7 @@ Uint32 event_dispatcher(void)
     return 1;
 }
 
-/* loop more or less copied from yay
+/* loop based upon yay
  * http://freecode.com/projects/yay
  */
 Uint32 event_loop(void)
@@ -655,6 +732,9 @@ Uint32 event_loop(void)
                         if (frame > 1) {
                             frame--;
                             fseek(fd, ((frame-1) * P.frame_size), SEEK_SET);
+                            if (P.diff) {
+                                fseek(P.fd2, ((frame-1) * P.frame_size), SEEK_SET);
+                            }
                             read_frame();
                             draw_frame();
                             send_message(PREV);
@@ -686,6 +766,9 @@ Uint32 event_loop(void)
                         if (frame > 1) {
                             frame = 1;
                             fseek(fd, 0, SEEK_SET);
+                            if (P.diff) {
+                                fseek(P.fd2, 0, SEEK_SET);
+                            }
                             read_frame();
                             draw_frame();
                             send_message(REW);
@@ -773,9 +856,15 @@ Uint32 event_loop(void)
 
 Uint32 parse_input(int argc, char **argv)
 {
-    if (argc != 5) {
+    if (argc != 5 && argc != 6) {
         usage(argv[0]);
         return 0;
+    }
+
+    if (argc == 6) {
+        /* diff mode */
+        P.diff = 1;
+        P.fname_diff = argv[5];
     }
 
     P.filename = argv[1];
@@ -803,6 +892,24 @@ Uint32 parse_input(int argc, char **argv)
         return 0;
     }
 
+    return 1;
+}
+
+Uint32 open_input(void)
+{
+    fd = fopen(P.filename, "rb");
+    if (fd == NULL) {
+        fprintf(stderr, "Error opening %s\n", P.filename);
+        return 0;
+    }
+
+    if (P.diff) {
+        P.fd2 = fopen(P.fname_diff, "rb");
+        if (P.fd2 == NULL) {
+            fprintf(stderr, "Error opening %s\n", P.fname_diff);
+            return 0;
+        }
+    }
     return 1;
 }
 
@@ -846,27 +953,28 @@ Uint32 sdl_init(void)
 
 int main(int argc, char** argv)
 {
+    int ret = EXIT_SUCCESS;
+
     /* Initialize param struct to zero */
     memset(&P, 0, sizeof(P));
 
     if (!parse_input(argc, argv)) {
-        return(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     /* Initialize parameters corresponding to YUV-format */
     setup_param();
 
     if (!sdl_init()) {
-        return(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
-    fd = fopen(P.filename, "rb");
-    if (fd == NULL) {
-        fprintf(stderr, "Error opening %s\n", P.filename);
-        goto cleanup;
+    if (!open_input()) {
+        return EXIT_FAILURE;
     }
 
     if (!allocate_memory()) {
+        ret = EXIT_FAILURE;
         goto cleanup;
     }
 
@@ -882,7 +990,6 @@ int main(int argc, char** argv)
     event_loop();
 
 cleanup:
-
     destroy_message_queue();
     SDL_FreeYUVOverlay(my_overlay);
     free(P.raw);
@@ -892,6 +999,9 @@ cleanup:
     if (fd) {
         fclose(fd);
     }
+    if (P.fd2) {
+        fclose(P.fd2);
+    }
 
-    return EXIT_SUCCESS;
+    return ret;
 }

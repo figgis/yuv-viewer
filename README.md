@@ -29,6 +29,7 @@ Features
 - Only display Luma data
 - Only display Cr data
 - Only display Cb data
+- Diff two files of the same size and format
 - Master/Slave mode that allows two instances of
   the binary to communicate using a message-queue.
   Commands issued in the Master are also executed
@@ -36,15 +37,15 @@ Features
   side-by-side to compare them. Works regardless of
   format used
 
-Basic Usage
------------
+Usage
+-----
 
     ./yv filename width height format
     ./yv foreman_cif.yuv 352 288 YV12
 
 To use MASTER/SLAVE, type the following
 command in two different shells or send them to
-the background using a '&' at the end:
+the background using a `&` at the end:
 
     ./yv foreman_1.yuv 352 288 YV12
     ./yv foreman_2.yuv 352 288 YV12
@@ -53,6 +54,13 @@ In the first window, press F1 (title should be updated
 to show the mode. In the second window, press F2
 (title should be updated to show the mode).
 Commands given in window1 should be executed in window2.
+
+To display diff between two files of the same size
+and format, just add file as the last argument
+(computes and displays differences in luma value only):
+
+    ./yv filename width height format diff_file
+    ./yv foreman_cif.yuv 352 288 YV12 forman_filtered_cif.yuv
 
 Supported commands
 ------------------
