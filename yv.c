@@ -147,16 +147,15 @@ Uint32 read_iyuv(void)
 
 Uint32 read_422(void)
 {
-    Uint32 i;
     Uint8* y = P.y_data;
     Uint8* cb = P.cb_data;
     Uint8* cr = P.cr_data;
 
     if (!rd(P.raw, P.frame_size)) return 0;
 
-    for (i = P.y_start_pos; i < P.frame_size; i += 2) *y++ = P.raw[i];
-    for (i = P.cb_start_pos; i < P.frame_size; i += 4) *cb++ = P.raw[i];
-    for (i = P.cr_start_pos; i < P.frame_size; i += 4) *cr++ = P.raw[i];
+    for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) *y++ = P.raw[i];
+    for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) *cb++ = P.raw[i];
+    for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) *cr++ = P.raw[i];
     return 1;
 }
 
@@ -176,22 +175,20 @@ Uint32 allocate_memory(void)
 
 void draw_grid422(void)
 {
-    Uint32 x, y;
-
     if (!P.grid) {
         return;
     }
 
     /* horizontal grid lines */
-    for (y = 0; y < P.height; y += 16) {
-        for (x = P.grid_start_pos; x < P.width * 2; x += 16) {
+    for (Uint32 y = 0; y < P.height; y += 16) {
+        for (Uint32 x = P.grid_start_pos; x < P.width * 2; x += 16) {
             *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
             *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x + 8) = 0x20;
         }
     }
     /* vertical grid lines */
-    for (x = P.grid_start_pos; x < P.width * 2; x += 32) {
-        for (y = 0; y < P.height; y += 8) {
+    for (Uint32 x = P.grid_start_pos; x < P.width * 2; x += 32) {
+        for (Uint32 y = 0; y < P.height; y += 8) {
             *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
             *(my_overlay->pixels[0] + (y + 4) * my_overlay->pitches[0] + x) = 0x20;
         }
@@ -200,22 +197,20 @@ void draw_grid422(void)
 
 void draw_grid420(void)
 {
-    Uint32 x, y;
-
     if (!P.grid) {
         return;
     }
 
     /* horizontal grid lines */
-    for (y = 0; y < P.height; y += 16) {
-        for (x = 0; x < P.width; x += 8) {
+    for (Uint32 y = 0; y < P.height; y += 16) {
+        for (Uint32 x = 0; x < P.width; x += 8) {
             *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
             *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x + 4) = 0x20;
         }
     }
     /* vertical grid lines */
-    for (x = 0; x < P.width; x += 16) {
-        for (y = 0; y < P.height; y += 8) {
+    for (Uint32 x = 0; x < P.width; x += 16) {
+        for (Uint32 y = 0; y < P.height; y += 8) {
             *(my_overlay->pixels[0] + y * my_overlay->pitches[0] + x) = 0xF0;
             *(my_overlay->pixels[0] + (y + 4) * my_overlay->pitches[0] + x) = 0x20;
         }
@@ -224,72 +219,66 @@ void draw_grid420(void)
 
 void luma_only(void)
 {
-    Uint32 i;
-
     if (!P.y_only) {
         return;
     }
 
     if (FORMAT == YV12 || FORMAT == IYUV) {
         /* Set croma part to 0x80 */
-        for (i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
-        for (i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
+        for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
+        for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
         return;
     }
 
     /* YUY2, UYVY, YVYU */
-    for (i = P.cb_start_pos; i < P.frame_size; i += 4) {
+    for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) {
         *(my_overlay->pixels[0] + i) = 0x80;
     }
-    for (i = P.cr_start_pos; i < P.frame_size; i += 4) {
+    for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) {
         *(my_overlay->pixels[0] + i) = 0x80;
     }
 }
 
 void cb_only(void)
 {
-    Uint32 i;
-
     if (!P.cb_only) {
         return;
     }
 
     if (FORMAT == YV12 || FORMAT == IYUV) {
         /* Set Luma part and Cr to 0x80 */
-        for (i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
-        for (i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
+        for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
+        for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
         return;
     }
 
     /* YUY2, UYVY, YVYU */
-    for (i = P.y_start_pos; i < P.frame_size; i += 2) {
+    for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) {
         *(my_overlay->pixels[0] + i) = 0x80;
     }
-    for (i = P.cr_start_pos; i < P.frame_size; i += 4) {
+    for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) {
         *(my_overlay->pixels[1] + i) = 0x80;
     }
 }
 
 void cr_only(void)
 {
-    Uint32 i;
-
     if (!P.cr_only) {
         return;
     }
 
     if (FORMAT == YV12 || FORMAT == IYUV) {
         /* Set Luma part and Cb to 0x80 */
-        for (i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
-        for (i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
+        for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
+        for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
         return;
     }
 
     /* YUY2, UYVY, YVYU */
-    for (i = P.y_start_pos; i < P.frame_size; i += 2) {
+    for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) {
         *(my_overlay->pixels[0] + i) = 0x80;
     }
-    for (i = P.cb_start_pos; i < P.frame_size; i += 4) {
+    for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) {
         *(my_overlay->pixels[2] + i) = 0x80;
     }
 }
@@ -322,11 +311,9 @@ void usage(char* name)
 
 void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch)
 {
-    Uint32 i, j;
-
     printf("%s\n", str);
-    for (i = 0;i < rows;i++) {
-        for (j = 0; j < 16; j++) {
+    for (Uint32 i = 0; i < rows;i++) {
+        for (Uint32 j = 0; j < 16; j++) {
             printf("%02X ", data[pitch+i]);
         }
         printf("\n");
@@ -335,7 +322,7 @@ void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch)
 
 void show_mb(Uint32 mouse_x, Uint32 mouse_y)
 {
-    /* TODO: fix */
+    /* TODO: bad code */
     Uint32 MB;
     Uint32 pitch[5] = {64, 64, 128, 128, 128};
     Uint32 length[5] = {4, 4, 8, 8, 8};
@@ -345,8 +332,12 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
     if (!P.mb)
         return;
 
-    MB = mouse_x/(16*P.zoom) + (P.width/16)*(mouse_y/(16*P.zoom));
-    y_pitch = 256 * MB;
+    /* which MB are we in? */
+    MB = mouse_x / (16 * P.zoom) +
+        (P.width / 16) *
+        (mouse_y / (16 * P.zoom));
+
+    y_pitch = 16 * MB;
     cb_pitch = pitch[FORMAT] * MB;
     cr_pitch = pitch[FORMAT] * MB;
     printf("\nMB #%d\n", MB);
@@ -387,8 +378,6 @@ Uint32 diff_mode(void)
 {
     FILE* fd_tmp;
     Uint8* y_tmp;
-    Uint32 i;
-    Uint32 j = 0;
 
     /* Perhaps a bit ugly but it seams to work...
      * 1. read frame from fd
@@ -412,7 +401,7 @@ Uint32 diff_mode(void)
         return 0;
     }
 
-    for (i = 0; i < P.y_size; i++) {
+    for (Uint32 i = 0; i < P.y_size; i++) {
         y_tmp[i] = P.y_data[i];
     }
 
@@ -434,18 +423,19 @@ Uint32 diff_mode(void)
      * Clear croma data */
 
     if (FORMAT == YV12 || FORMAT == IYUV) {
-        for (i = 0; i < P.y_size; i++) {
+        for (Uint32 i = 0; i < P.y_size; i++) {
             P.y_data[i] = 0x80 - (y_tmp[i] - P.y_data[i]);
         }
-        for (i = 0; i < P.cb_size; i++) P.cb_data[i] = 0x80;
-        for (i = 0; i < P.cr_size; i++) P.cr_data[i] = 0x80;
+        for (Uint32 i = 0; i < P.cb_size; i++) P.cb_data[i] = 0x80;
+        for (Uint32 i = 0; i < P.cr_size; i++) P.cr_data[i] = 0x80;
     } else {
-        for (i = P.y_start_pos; i < P.frame_size; i += 2) {
+        Uint32 j = 0;
+        for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) {
             P.raw[i] = 0x80 - (y_tmp[j] - P.y_data[j]);
             j++;
         }
-        for (i = P.cb_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
-        for (i = P.cr_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
+        for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
+        for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4)  P.raw[i] = 0x80;
     }
 
     free(y_tmp);

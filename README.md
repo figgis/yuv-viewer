@@ -60,7 +60,7 @@ and format, just add file as the last argument
 (computes and displays differences in luma value only):
 
     ./yv filename width height format diff_file
-    ./yv foreman_cif.yuv 352 288 YV12 forman_filtered_cif.yuv
+    ./yv foreman_cif.yuv 352 288 YV12 foreman_filtered_cif.yuv
 
 Supported commands
 ------------------
