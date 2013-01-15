@@ -62,6 +62,7 @@ Uint32 event_dispatcher(void);
 Uint32 event_loop(void);
 Uint32 parse_input(int argc, char **argv);
 Uint32 sdl_init(void);
+void set_caption(char *array, Uint32 frame);
 
 SDL_Surface *screen;
 SDL_Event event;
@@ -650,7 +651,21 @@ Uint32 event_dispatcher(void)
     return 1;
 }
 
-/* loop based upon yay
+void set_caption(char *array, Uint32 frame)
+{
+    sprintf(array, "%s%s%s%s%s%s%s frame %d, zoom=%d",
+            (P.mode == MASTER) ? "[MASTER]" :
+            (P.mode == SLAVE) ? "[SLAVE]": "",
+            P.grid ? "G" : "",
+            P.mb ? "M" : "",
+            P.diff ? "D":"",
+            P.y_only ? "Y" : "",
+            P.cb_only ? "Cb" : "",
+            P.cr_only ? "Cr" : "",
+            frame, P.zoom);
+}
+
+/* loop inspired by yay
  * http://freecode.com/projects/yay
  */
 Uint32 event_loop(void)
@@ -663,10 +678,7 @@ Uint32 event_loop(void)
 
     while (!quit) {
 
-        sprintf(caption, "%s frame %d, zoom=%d",
-                (P.mode == MASTER) ? "[MASTER]" :
-                (P.mode == SLAVE) ? "[SLAVE]": "",
-                frame, P.zoom);
+        set_caption(caption, frame);
         SDL_WM_SetCaption(caption, NULL);
 
         /* wait for SDL event */
@@ -687,7 +699,7 @@ Uint32 event_loop(void)
                         play_yuv = 1; /* play it, sam! */
                         while (play_yuv) {
                             start_ticks = SDL_GetTicks();
-                            sprintf(caption, "frame %d, zoom=%d", frame, P.zoom);
+                            set_caption(caption, frame);
                             SDL_WM_SetCaption( caption, NULL );
 
                             /* check for next frame existing */
