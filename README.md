@@ -30,6 +30,7 @@ Features
 - Only display Cr data
 - Only display Cb data
 - Diff two files of the same size and format
+- PSNR calculation
 - Master/Slave mode that allows two instances of
   the binary to communicate using a message-queue.
   Commands issued in the Master are also executed
@@ -57,7 +58,8 @@ Commands given in window1 should be executed in window2.
 
 To display diff between two files of the same size
 and format, just add file as the last argument
-(computes and displays differences in luma value only):
+(computes and displays differences in luma value only,
+PSNR value is written to stdout):
 
     ./yv filename width height format diff_file
     ./yv foreman_cif.yuv 352 288 YV12 foreman_filtered_cif.yuv
