@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
 
@@ -45,6 +46,7 @@ void cr_only(void);
 void draw_420(void);
 void draw_422(void);
 Uint32 diff_mode(void);
+void calc_psnr(Uint8* frame0, Uint8* frame1);
 void usage(char* name);
 void mb_loop(char* str, Uint32 rows, Uint8* data, Uint32 pitch);
 void show_mb(Uint32 mouse_x, Uint32 mouse_y);
@@ -423,6 +425,8 @@ Uint32 diff_mode(void)
      * Calculate diff and place result where it belongs
      * Clear croma data */
 
+    calc_psnr(y_tmp, P.y_data);
+
     if (FORMAT == YV12 || FORMAT == IYUV) {
         for (Uint32 i = 0; i < P.y_size; i++) {
             P.y_data[i] = 0x80 - (y_tmp[i] - P.y_data[i]);
@@ -442,6 +446,30 @@ Uint32 diff_mode(void)
     free(y_tmp);
 
     return 1;
+}
+
+void calc_psnr(Uint8* frame0, Uint8* frame1)
+{
+    double mse = 0.0;
+    double mse_tmp = 0.0;
+    double psnr = 0.0;
+
+    for (Uint32 i = 0; i < P.y_size; i++) {
+        mse_tmp = abs(frame0[i] - frame1[i]);
+        mse += mse_tmp * mse_tmp;
+    }
+
+    /* division by zero */
+    if (mse == 0) {
+        fprintf(stdout, "PSNR: NaN\n");
+        return;
+    }
+
+    mse /= P.y_size;
+
+    psnr = 10.0*log10((256 * 256) / mse);
+
+    fprintf(stdout, "PSNR: %f\n", psnr);
 }
 
 void setup_param(void)
