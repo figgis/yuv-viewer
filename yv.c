@@ -65,6 +65,7 @@ Uint32 event_loop(void);
 Uint32 parse_input(int argc, char **argv);
 Uint32 sdl_init(void);
 void set_caption(char *array, Uint32 frame);
+void set_zoom_rect(void);
 
 SDL_Surface *screen;
 SDL_Event event;
@@ -84,8 +85,9 @@ struct param {
     Uint32 height;            /* frame height - in pixels */
     Uint32 wh;                /* width x height */
     Uint32 frame_size;        /* size of 1 frame - in bytes */
-    Uint32 zoom;              /* zoom-factor */
-    Uint32 min_zoom;
+    Sint32 zoom;              /* zoom-factor */
+    Uint32 zoom_width;
+    Uint32 zoom_height;
     Uint32 grid;              /* grid-mode - on or off */
     Uint32 grid_start_pos;
     Uint32 diff;              /* diff-mode */
@@ -360,10 +362,11 @@ void draw_frame(void)
 {
     SDL_LockYUVOverlay(my_overlay);
     (*drawer[FORMAT])();
+    set_zoom_rect();
     video_rect.x = 0;
     video_rect.y = 0;
-    video_rect.w = P.width * P.zoom;
-    video_rect.h = P.height * P.zoom;
+    video_rect.w = P.zoom_width;
+    video_rect.h = P.zoom_height;
     SDL_UnlockYUVOverlay(my_overlay);
     SDL_DisplayYUVOverlay(my_overlay, &video_rect);
 }
@@ -475,7 +478,6 @@ void calc_psnr(Uint8* frame0, Uint8* frame1)
 void setup_param(void)
 {
     P.zoom = 1;
-    P.min_zoom = 1;
     P.wh = P.width * P.height;
 
     if (FORMAT == YV12 || FORMAT == IYUV) {
@@ -681,7 +683,7 @@ Uint32 event_dispatcher(void)
 
 void set_caption(char *array, Uint32 frame)
 {
-    sprintf(array, "%s%s%s%s%s%s%s frame %d, zoom=%d",
+    sprintf(array, "%s%s%s%s%s%s%s frame %d, size %dx%d",
             (P.mode == MASTER) ? "[MASTER]" :
             (P.mode == SLAVE) ? "[SLAVE]": "",
             P.grid ? "G" : "",
@@ -690,7 +692,22 @@ void set_caption(char *array, Uint32 frame)
             P.y_only ? "Y" : "",
             P.cb_only ? "Cb" : "",
             P.cr_only ? "Cr" : "",
-            frame, P.zoom);
+            frame,
+            P.zoom_width,
+            P.zoom_height);
+}
+
+void set_zoom_rect(void)
+{
+    if (P.zoom > 0) {
+        P.zoom_width = P.width * P.zoom;
+        P.zoom_height = P.height * P.zoom;
+    } else if (P.zoom <= 0) {
+        P.zoom_width = P.width / (abs(P.zoom) + 2);
+        P.zoom_height = P.height / (abs(P.zoom) + 2);
+    } else {
+        fprintf(stderr, "ERROR in zoom:\n");
+    }
 }
 
 /* loop inspired by yay
@@ -772,25 +789,25 @@ Uint32 event_loop(void)
                         break;
                     case SDLK_UP: /* zoom in */
                         P.zoom++;
-                        screen = SDL_SetVideoMode(P.width*P.zoom,
-                                                  P.height*P.zoom,
+                        set_zoom_rect();
+                        screen = SDL_SetVideoMode(P.zoom_width,
+                                                  P.zoom_height,
                                                   P.bpp, P.vflags);
-                        video_rect.w = P.width*P.zoom;
-                        video_rect.h = P.height*P.zoom;
+                        video_rect.w = P.zoom_width;
+                        video_rect.h = P.zoom_height;
                         SDL_DisplayYUVOverlay(my_overlay, &video_rect);
                         send_message(ZOOM_IN);
                         break;
                     case SDLK_DOWN: /* zoom out */
-                        if (P.zoom>P.min_zoom) {
-                            P.zoom--;
-                            screen = SDL_SetVideoMode(P.width*P.zoom,
-                                                      P.height*P.zoom,
-                                                      P.bpp, P.vflags);
-                            video_rect.w = P.width*P.zoom;
-                            video_rect.h = P.height*P.zoom;
-                            SDL_DisplayYUVOverlay(my_overlay, &video_rect);
-                            send_message(ZOOM_OUT);
-                        }
+                        P.zoom--;
+                        set_zoom_rect();
+                        screen = SDL_SetVideoMode(P.zoom_width,
+                                                  P.zoom_height,
+                                                  P.bpp, P.vflags);
+                        video_rect.w = P.zoom_width;
+                        video_rect.h = P.zoom_height;
+                        SDL_DisplayYUVOverlay(my_overlay, &video_rect);
+                        send_message(ZOOM_OUT);
                         break;
                     case SDLK_r: /* rewind */
                         if (frame > 1) {
@@ -806,10 +823,14 @@ Uint32 event_loop(void)
                         break;
                     case SDLK_g: /* display grid */
                         P.grid = ~P.grid;
+                        if (P.zoom < 1)
+                            P.grid = 0;
                         draw_frame();
                         break;
                     case SDLK_m: /* show mb-data on stdout */
                         P.mb = ~P.mb;
+                        if (P.zoom < 1)
+                            P.mb = 0;
                         draw_frame();
                         break;
                     case SDLK_F5: /* Luma data only */

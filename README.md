@@ -21,8 +21,8 @@ Features
 - Rewind
 - Single Step Forward
 - Single Step Backwards
-- Zoom In
-- Zoom Out
+- Zoom In by a factor of 1..n
+- Zoom Out by a factor of 1..n
 - Display a 16x16 grid on top of a frame
 - Dump Macro-Block-data to stdout for MB pointed
   to by mouse
@@ -37,6 +37,8 @@ Features
   in the Slave. Main usage is to single-step two clips
   side-by-side to compare them. Works regardless of
   format used
+- Title reflects mode, feature used, including
+  frame number and size.
 
 Usage
 -----
@@ -80,7 +82,6 @@ Supported commands
     F6 - Toggle viewing of Cb data only
     F7 - Toggle viewing of Cr data only
     F8 - Display all color-planes
-    b - Only display Luma data
     q - Quit
     F1 - MASTER-mode
     F2 - SLAVE-mode
