@@ -39,6 +39,8 @@ Features
   format used
 - Title reflects mode, feature used, including
   frame number and size.
+- Histogram for the different color planes, per frame
+  as csv-data to stdout (for now at least)
 
 Usage
 -----
@@ -78,6 +80,7 @@ Supported commands
     g - Enable grid-mode
     m - Enable MB-mode, point and click to
         print MB-data to stdout
+    h - histogram, 1 per color plane
     F5 - Toggle viewing of Luma data only
     F6 - Toggle viewing of Cb data only
     F7 - Toggle viewing of Cr data only

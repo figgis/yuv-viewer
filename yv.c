@@ -66,6 +66,7 @@ Uint32 parse_input(int argc, char **argv);
 Uint32 sdl_init(void);
 void set_caption(char *array, Uint32 frame);
 void set_zoom_rect(void);
+void histogram(void);
 
 SDL_Surface *screen;
 SDL_Event event;
@@ -89,6 +90,7 @@ struct param {
     Uint32 zoom_width;
     Uint32 zoom_height;
     Uint32 grid;              /* grid-mode - on or off */
+    Uint32 hist;              /* histogram-mode - on or off */
     Uint32 grid_start_pos;
     Uint32 diff;              /* diff-mode */
     Uint32 y_start_pos;       /* start pos for first Y pel */
@@ -297,6 +299,7 @@ void draw_420(void)
     luma_only();
     cb_only();
     cr_only();
+    histogram();
 }
 
 void draw_422(void)
@@ -306,6 +309,7 @@ void draw_422(void)
     luma_only();
     cb_only();
     cr_only();
+    histogram();
 }
 
 void usage(char* name)
@@ -334,8 +338,9 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
 
     Uint16 y_pitch, cb_pitch, cr_pitch;
 
-    if (!P.mb)
+    if (!P.mb) {
         return;
+    }
 
     /* which MB are we in? */
     MB = mouse_x / (16 * P.zoom) +
@@ -475,6 +480,30 @@ void calc_psnr(Uint8* frame0, Uint8* frame1)
     fprintf(stdout, "PSNR: %f\n", psnr);
 }
 
+void histogram(void)
+{
+    if (!P.hist) {
+        return;
+    }
+
+    Uint8 y[256] = {0};
+    Uint8 b[256] = {0};
+    Uint8 r[256] = {0};
+
+    for (Uint32 i = 0; i < P.y_size; i++) y[P.y_data[i]]++;
+    for (Uint32 i = 0; i < P.cb_size; i++) b[P.cb_data[i]]++;
+    for (Uint32 i = 0; i < P.cr_size; i++) r[P.cr_data[i]]++;
+
+    fprintf(stdout, "\nY,");
+    for (Uint32 i = 0; i < 256; i++)  fprintf(stdout, "%u,", y[i]);
+    fprintf(stdout, "\nCb,");
+    for (Uint32 i = 0; i < 256; i++)  fprintf(stdout, "%u,", b[i]);
+    fprintf(stdout, "\nCr,");
+    for (Uint32 i = 0; i < 256; i++)  fprintf(stdout, "%u,", r[i]);
+    fprintf(stdout, "\n");
+    fflush(stdout);
+}
+
 void setup_param(void)
 {
     P.zoom = 1;
@@ -573,8 +602,9 @@ Uint32 connect_message_queue(void)
 
 Uint32 send_message(char cmd)
 {
-    if (P.mode != MASTER)
+    if (P.mode != MASTER) {
         return 1;
+    }
 
     P.buf.mtext[0] = cmd;
     P.buf.mtext[1] = '\0';
@@ -683,12 +713,13 @@ Uint32 event_dispatcher(void)
 
 void set_caption(char *array, Uint32 frame)
 {
-    sprintf(array, "%s%s%s%s%s%s%s frame %d, size %dx%d",
+    sprintf(array, "%s%s%s%s%s%s%s%s frame %d, size %dx%d",
             (P.mode == MASTER) ? "[MASTER]" :
             (P.mode == SLAVE) ? "[SLAVE]": "",
             P.grid ? "G" : "",
             P.mb ? "M" : "",
-            P.diff ? "D":"",
+            P.diff ? "D" : "",
+            P.hist ? "H" : "",
             P.y_only ? "Y" : "",
             P.cb_only ? "Cb" : "",
             P.cr_only ? "Cr" : "",
@@ -860,6 +891,10 @@ Uint32 event_loop(void)
                         P.cr_only = 0;
                         draw_frame();
                         send_message(ALL_PLANES);
+                        break;
+                    case SDLK_h: /* histogram */
+                        P.hist = ~P.hist;
+                        draw_frame();
                         break;
                     case SDLK_F1: /* MASTER-mode */
                         create_message_queue();
