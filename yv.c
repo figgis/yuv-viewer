@@ -621,6 +621,7 @@ Uint32 read_message(void)
 {
     if (msgrcv(P.msqid, &P.buf, sizeof(P.buf.mtext), 0, 0) == -1) {
         perror("msgrcv");
+        P.mode = NONE;
         return 0;
     }
 
@@ -897,10 +898,14 @@ Uint32 event_loop(void)
                         draw_frame();
                         break;
                     case SDLK_F1: /* MASTER-mode */
-                        create_message_queue();
-                        P.mode = MASTER;
+                        if (create_message_queue()) {
+                            P.mode = MASTER;
+                        }
                         break;
                     case SDLK_F2: /* SLAVE-mode */
+                        if (P.mode == MASTER) {
+                            destroy_message_queue();
+                        }
                         if (connect_message_queue()) {
                             P.mode = SLAVE;
                         }
