@@ -64,7 +64,7 @@ Uint32 event_dispatcher(void);
 Uint32 event_loop(void);
 Uint32 parse_input(int argc, char **argv);
 Uint32 sdl_init(void);
-void set_caption(char *array, Uint32 frame);
+void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
 
@@ -712,9 +712,10 @@ Uint32 event_dispatcher(void)
     return 1;
 }
 
-void set_caption(char *array, Uint32 frame)
+void set_caption(char *array, Uint32 frame, Uint32 bytes)
 {
-    sprintf(array, "%s%s%s%s%s%s%s%s frame %d, size %dx%d",
+    snprintf(array, bytes, "%s - %s%s%s%s%s%s%s%s frame %d, size %dx%d",
+            P.filename,
             (P.mode == MASTER) ? "[MASTER]" :
             (P.mode == SLAVE) ? "[SLAVE]": "",
             P.grid ? "G" : "",
@@ -747,7 +748,7 @@ void set_zoom_rect(void)
  */
 Uint32 event_loop(void)
 {
-    char caption[64];
+    char caption[256];
     Uint16 quit = 0;
     Uint32 frame = 0;
     int play_yuv = 0;
@@ -755,7 +756,7 @@ Uint32 event_loop(void)
 
     while (!quit) {
 
-        set_caption(caption, frame);
+        set_caption(caption, frame, 256);
         SDL_WM_SetCaption(caption, NULL);
 
         /* wait for SDL event */
@@ -776,7 +777,7 @@ Uint32 event_loop(void)
                         play_yuv = 1; /* play it, sam! */
                         while (play_yuv) {
                             start_ticks = SDL_GetTicks();
-                            set_caption(caption, frame);
+                            set_caption(caption, frame, 256);
                             SDL_WM_SetCaption( caption, NULL );
 
                             /* check for next frame existing */
