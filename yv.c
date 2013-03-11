@@ -568,7 +568,11 @@ void check_input(void)
 
 Uint32 create_message_queue(void)
 {
-    if ((P.key = ftok("yv.c", 'B')) == -1) {
+    /* Should probably use argv[0] or similar as pathname
+     * when creating the key;
+     * but let's keep it simple for now. Y for YCbCr
+     */
+    if ((P.key = ftok("/tmp", 'Y')) == -1) {
         perror("ftok");
         return 0;
     }
@@ -585,7 +589,7 @@ Uint32 create_message_queue(void)
 
 Uint32 connect_message_queue(void)
 {
-    if ((P.key = ftok("yv.c", 'B')) == -1) {
+    if ((P.key = ftok("/tmp", 'Y')) == -1) {
         perror("ftok");
         return 0;
     }
