@@ -14,6 +14,7 @@
 #define YUY2 2
 #define UYVY 3
 #define YVYU 4
+#define YV1210 5    /* 10 bpp YV12 */
 
 /* IPC */
 #define NONE 0
@@ -37,6 +38,7 @@ Uint32 rd(Uint8* data, Uint32 size);
 Uint32 read_yv12(void);
 Uint32 read_iyuv(void);
 Uint32 read_422(void);
+Uint32 read_yv1210(void);
 Uint32 allocate_memory(void);
 void draw_grid422(void);
 void draw_grid420(void);
@@ -67,6 +69,7 @@ Uint32 sdl_init(void);
 void set_caption(char *array, Uint32 frame, Uint32 bytes);
 void set_zoom_rect(void);
 void histogram(void);
+Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length);
 
 SDL_Surface *screen;
 SDL_Event event;
@@ -163,6 +166,46 @@ Uint32 read_422(void)
     for (Uint32 i = P.y_start_pos; i < P.frame_size; i += 2) *y++ = P.raw[i];
     for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) *cb++ = P.raw[i];
     for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) *cr++ = P.raw[i];
+    return 1;
+}
+
+Uint32 read_yv1210(void)
+{
+    Uint8* data;
+
+    data = malloc(sizeof(Uint8) * P.y_size * 2);
+    if (!data) {
+        fprintf(stderr, "Error allocating memory...\n");
+        return 0;
+    }
+
+    if (!rd(data, P.y_size * 2)) return 0;
+    ten2eight(data, P.y_data, P.y_size * 2);
+
+    if (!rd(data, P.cb_size * 2)) return 0;
+    ten2eight(data, P.cb_data, P.cb_size * 2);
+
+    if (!rd(data, P.cr_size * 2)) return 0;
+    ten2eight(data, P.cr_data, P.cr_size * 2);
+
+    free(data);
+
+    return 1;
+}
+
+Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length)
+{
+    Uint16 x = 0;
+
+    for (Uint32 i = 0; i < length; i += 2) {
+        x = (src[i+1] << 8) | src[i];
+        x = (x + 2) >> 2;
+        if (x > 255) {
+            x = 255;
+        }
+        *dst++ = x;
+    }
+
     return 1;
 }
 
@@ -360,8 +403,8 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
     fflush(stdout);
 }
 
-Uint32 (*reader[5])(void) = {read_yv12, read_iyuv, read_422, read_422, read_422};
-void (*drawer[5])(void) = {draw_420, draw_420, draw_422, draw_422, draw_422};
+Uint32 (*reader[])(void) = {read_yv12, read_iyuv, read_422, read_422, read_422, read_yv1210};
+void (*drawer[])(void) = {draw_420, draw_420, draw_422, draw_422, draw_422, draw_420};
 
 void draw_frame(void)
 {
@@ -520,6 +563,13 @@ void setup_param(void)
         P.y_size = P.wh;
         P.cb_size = P.wh / 2;
         P.cr_size = P.wh / 2;
+    } else if (FORMAT == YV1210) {
+        /* SDL cannot natively display this format; let's fake it
+         * and pretend it's YV12 */
+        P.frame_size = P.wh * 3 / 2;
+        P.y_size = P.wh;
+        P.cb_size = P.wh / 4;
+        P.cr_size = P.wh / 4;
     }
 
     if (FORMAT == YUY2) {
@@ -968,7 +1018,11 @@ Uint32 parse_input(int argc, char **argv)
     P.width = atoi(argv[2]);
     P.height = atoi(argv[3]);
 
-    if (!strncmp(argv[4], "YV12", 4)) {
+    if (!strncmp(argv[4], "YV1210", 6)) {
+        printf("YV1210\n");
+        P.overlay_format = SDL_YV12_OVERLAY;
+        FORMAT = YV1210;
+    } else if (!strncmp(argv[4], "YV12", 6)) {
         P.overlay_format = SDL_YV12_OVERLAY;
         FORMAT = YV12;
     } else if (!strncmp(argv[4], "IYUV", 4)) {
