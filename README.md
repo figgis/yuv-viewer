@@ -9,10 +9,15 @@ Supports the following formats:
 - UYVY
 - YUY2
 - YV1210
+- Y42210
 
 YV1210 is the same as YV12 with 10bpp.
 Since SDL does not support this format, I fake it
 by converting it to standard 8bpp YV12 prior to viewing.
+
+Y42210 is YCbCr 4:2:2 planar with 10-bpp.
+Since SDL does not support this format, I fake it
+by converting it to standard 8bpp YVYU prior to viewing.
 
 Basically, because that's whats SDL supports.
 Other YCbCr (YUV) formats are simple to add as long as

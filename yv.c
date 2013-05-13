@@ -15,6 +15,7 @@
 #define UYVY 3
 #define YVYU 4
 #define YV1210 5    /* 10 bpp YV12 */
+#define Y42210 6
 
 /* IPC */
 #define NONE 0
@@ -38,6 +39,7 @@ Uint32 rd(Uint8* data, Uint32 size);
 Uint32 read_yv12(void);
 Uint32 read_iyuv(void);
 Uint32 read_422(void);
+Uint32 read_y42210(void);
 Uint32 read_yv1210(void);
 Uint32 allocate_memory(void);
 void draw_grid422(void);
@@ -169,8 +171,57 @@ Uint32 read_422(void)
     return 1;
 }
 
+Uint32 read_y42210(void)
+{
+    Uint32 ret = 1;
+    Uint8* data;
+    Uint8* tmp;
+
+    data = malloc(sizeof(Uint8) * P.frame_size * 2);
+    if (!data) {
+        fprintf(stderr, "Error allocating memory...\n");
+        return 0;
+    }
+
+    tmp = malloc(sizeof(Uint8) * P.frame_size);
+    if (!tmp) {
+        fprintf(stderr, "Error allocating memory...\n");
+        ret = 0;
+        goto cleany42210;
+    }
+
+    if (!rd(data, P.frame_size * 2)) {
+        ret = 0;
+        goto cleany42210;
+    }
+    ten2eight(data, tmp, P.frame_size * 2);
+
+    /* Y  */
+    for (Uint32 i = 0, j = 0; i < P.frame_size; i += 2) {
+        P.raw[i] = tmp[j];
+        j++;
+    }
+    /* Cb */
+    for (Uint32 i = P.cb_start_pos, j = 0 ; i < P.frame_size; i += 4) {
+        P.raw[i] = tmp[P.wh + j];
+        j++;
+    }
+    /* Cr */
+    for (Uint32 i = P.cr_start_pos, j = 0; i < P.frame_size; i += 4) {
+        P.raw[i] = tmp[P.wh/2*3 + j];
+        j++;
+    }
+
+cleany42210:
+    free(tmp);
+    free(data);
+
+    return ret;
+}
+
 Uint32 read_yv1210(void)
 {
+    Uint32 ret = 1;
     Uint8* data;
 
     data = malloc(sizeof(Uint8) * P.y_size * 2);
@@ -179,18 +230,28 @@ Uint32 read_yv1210(void)
         return 0;
     }
 
-    if (!rd(data, P.y_size * 2)) return 0;
+    if (!rd(data, P.y_size * 2)) {
+        ret = 0;
+        goto cleanyv1210;
+    }
     ten2eight(data, P.y_data, P.y_size * 2);
 
-    if (!rd(data, P.cb_size * 2)) return 0;
+    if (!rd(data, P.cb_size * 2)) {
+        ret = 0;
+        goto cleanyv1210;
+    }
     ten2eight(data, P.cb_data, P.cb_size * 2);
 
-    if (!rd(data, P.cr_size * 2)) return 0;
+    if (!rd(data, P.cr_size * 2)) {
+        ret = 0;
+        goto cleanyv1210;
+    }
     ten2eight(data, P.cr_data, P.cr_size * 2);
 
+cleanyv1210:
     free(data);
 
-    return 1;
+    return ret;
 }
 
 Uint32 ten2eight(Uint8* src, Uint8* dst, Uint32 length)
@@ -273,7 +334,7 @@ void luma_only(void)
         return;
     }
 
-    if (FORMAT == YV12 || FORMAT == IYUV) {
+    if (FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
         /* Set croma part to 0x80 */
         for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
         for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
@@ -295,7 +356,7 @@ void cb_only(void)
         return;
     }
 
-    if (FORMAT == YV12 || FORMAT == IYUV) {
+    if (FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
         /* Set Luma part and Cr to 0x80 */
         for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
         for (Uint32 i = 0; i < P.cr_size; i++) my_overlay->pixels[1][i] = 0x80;
@@ -307,7 +368,7 @@ void cb_only(void)
         *(my_overlay->pixels[0] + i) = 0x80;
     }
     for (Uint32 i = P.cr_start_pos; i < P.frame_size; i += 4) {
-        *(my_overlay->pixels[1] + i) = 0x80;
+        *(my_overlay->pixels[0] + i) = 0x80;
     }
 }
 
@@ -317,7 +378,7 @@ void cr_only(void)
         return;
     }
 
-    if (FORMAT == YV12 || FORMAT == IYUV) {
+    if (FORMAT == YV12 || FORMAT == IYUV || FORMAT == YV1210) {
         /* Set Luma part and Cb to 0x80 */
         for (Uint32 i = 0; i < P.y_size; i++) my_overlay->pixels[0][i] = 0x80;
         for (Uint32 i = 0; i < P.cb_size; i++) my_overlay->pixels[2][i] = 0x80;
@@ -329,7 +390,7 @@ void cr_only(void)
         *(my_overlay->pixels[0] + i) = 0x80;
     }
     for (Uint32 i = P.cb_start_pos; i < P.frame_size; i += 4) {
-        *(my_overlay->pixels[2] + i) = 0x80;
+        *(my_overlay->pixels[0] + i) = 0x80;
     }
 }
 
@@ -403,8 +464,8 @@ void show_mb(Uint32 mouse_x, Uint32 mouse_y)
     fflush(stdout);
 }
 
-Uint32 (*reader[])(void) = {read_yv12, read_iyuv, read_422, read_422, read_422, read_yv1210};
-void (*drawer[])(void) = {draw_420, draw_420, draw_422, draw_422, draw_422, draw_420};
+Uint32 (*reader[])(void) = {read_yv12, read_iyuv, read_422, read_422, read_422, read_yv1210, read_y42210};
+void (*drawer[])(void) = {draw_420, draw_420, draw_422, draw_422, draw_422, draw_420, draw_422};
 
 void draw_frame(void)
 {
@@ -557,7 +618,7 @@ void setup_param(void)
         P.y_size = P.wh;
         P.cb_size = P.wh / 4;
         P.cr_size = P.wh / 4;
-    } else if (FORMAT == YUY2 || FORMAT == UYVY || FORMAT == YVYU) {
+    } else if (FORMAT == YUY2 || FORMAT == UYVY || FORMAT == YVYU || FORMAT == Y42210) {
         P.grid_start_pos = 0;
         P.frame_size = P.wh * 2;
         P.y_size = P.wh;
@@ -585,7 +646,7 @@ void setup_param(void)
         P.grid_start_pos = 1;
         P.cb_start_pos = 0;
         P.cr_start_pos = 2;
-    } else if (FORMAT == YVYU) {
+    } else if (FORMAT == YVYU || FORMAT == Y42210)  {
         /* Y V Y U
          * 0 1 2 3 */
         P.y_start_pos = 0;
@@ -1019,10 +1080,9 @@ Uint32 parse_input(int argc, char **argv)
     P.height = atoi(argv[3]);
 
     if (!strncmp(argv[4], "YV1210", 6)) {
-        printf("YV1210\n");
         P.overlay_format = SDL_YV12_OVERLAY;
         FORMAT = YV1210;
-    } else if (!strncmp(argv[4], "YV12", 6)) {
+    } else if (!strncmp(argv[4], "YV12", 4)) {
         P.overlay_format = SDL_YV12_OVERLAY;
         FORMAT = YV12;
     } else if (!strncmp(argv[4], "IYUV", 4)) {
@@ -1037,6 +1097,10 @@ Uint32 parse_input(int argc, char **argv)
     } else if (!strncmp(argv[4], "YVYU", 4)) {
         P.overlay_format = SDL_YVYU_OVERLAY;
         FORMAT = YVYU;
+    } else if (!strncmp(argv[4], "Y42210", 6)) {
+        /* No support for 422, display it as YVYU */
+        P.overlay_format = SDL_YVYU_OVERLAY;
+        FORMAT = Y42210;
     } else {
         fprintf(stderr, "The format option '%s' is not recognized\n", argv[4]);
         return 0;
